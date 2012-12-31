@@ -9,4 +9,5 @@ dist
 _trial_temp
 deluge/i18n/*/
 *.desktop
+.build_data*
 osx/app

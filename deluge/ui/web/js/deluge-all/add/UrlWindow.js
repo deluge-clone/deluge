@@ -81,7 +81,7 @@ Deluge.add.UrlWindow = Ext.extend(Deluge.add.Window, {
         var cookies = this.cookieField.getValue();
         var torrentId = this.createTorrentId();
 
-        if (url.substring(0,20) == 'magnet:?xt=urn:btih:') {
+        if (url.indexOf('magnet:?') == 0 && url.indexOf('xt=urn:btih') > -1) {
             deluge.client.web.get_magnet_info(url, {
                 success: this.onGotInfo,
                 scope: this,
@@ -91,6 +91,7 @@ Deluge.add.UrlWindow = Ext.extend(Deluge.add.Window, {
         } else {
             deluge.client.web.download_torrent_from_url(url, cookies, {
                 success: this.onDownload,
+                failure: this.onDownloadFailed,
                 scope: this,
                 torrentId: torrentId
             });
@@ -108,6 +109,18 @@ Deluge.add.UrlWindow = Ext.extend(Deluge.add.Window, {
             filename: filename,
             torrentId: req.options.torrentId
         });
+    },
+
+    onDownloadFailed: function(obj, resp, req) {
+        Ext.MessageBox.show({
+            title: _('Error'),
+            msg: _('Failed to download torrent'),
+            buttons: Ext.MessageBox.OK,
+            modal: false,
+            icon: Ext.MessageBox.ERROR,
+            iconCls: 'x-deluge-icon-error'
+        });
+        this.fireEvent('addfailed', req.options.torrentId);
     },
 
     onGotInfo: function(info, obj, response, request) {

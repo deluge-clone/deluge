@@ -197,6 +197,15 @@ class GtkUI(object):
                     return 1
             SetConsoleCtrlHandler(win_handler)
 
+        if deluge.common.osx_check():
+            # TODO: quartz check
+            import gtk_osxapplication
+            self.osxapp = gtk_osxapplication.OSXApplication()
+            def on_die(*args):
+                reactor.stop()
+            self.osxapp.connect("NSApplicationWillTerminate", on_die)
+
+
         # Set process name again to fix gtk issue
         setproctitle(getproctitle())
 
@@ -239,8 +248,86 @@ class GtkUI(object):
         self.addtorrentdialog = AddTorrentDialog()
 
         if deluge.common.osx_check():
-            from osx import OSX
-            self.osx = OSX(self)
+            # TODO: quartz check
+
+            ## Doesn't do what expected yet
+            def nsapp_open_file(osxapp, filename):
+                # Will be raised at app launch (python opening main script)
+                if filename.endswith('Deluge-bin'):
+                    return True
+                self.ipcinterface.process_args(filename)
+            #self.osxapp.connect("NSApplicationOpenFile", nsapp_open_file)
+
+
+            def accel_swap(item, group, skey, smod, dkey, dmod):
+                item.remove_accelerator(group, ord(skey), smod)
+                item.add_accelerator("activate", group, ord(dkey), dmod, gtk.ACCEL_VISIBLE)
+
+            def accel_meta(item, group, key):
+                ## accel_swap
+                accel_swap(item, group, key, gtk.gdk.CONTROL_MASK, key, gtk.gdk.META_MASK)
+
+            # this removes and readds menu items with new key accelerators
+            log.debug('menu_bar')
+            window = self.mainwindow
+            glade  = window.main_glade
+            mbar = glade.get_widget("menubar")
+            group = gtk.accel_groups_from_object(window.window)[0]
+
+            # NOTE: accel maps doesn't work with glade file format
+            # because of libglade not setting MenuItem accel groups
+            # That's why we remove / set accelerators by hand... (dirty)
+            # Clean solution: migrate glades files to gtkbuilder format
+            file_menu = glade.get_widget("menu_file").get_submenu()
+            file_items = file_menu.get_children()
+            ## accel_meta
+            accel_meta(file_items[0], group, 'o')
+            accel_meta(file_items[1], group, 'n')
+            quit_all_item = file_items[3]
+            ## accel_swap
+            accel_swap(quit_all_item, group, 'q', gtk.gdk.SHIFT_MASK | gtk.gdk.CONTROL_MASK,
+                                                  'q', gtk.gdk.SHIFT_MASK | gtk.gdk.META_MASK)
+            for item in range(2, len(file_items)): # remove quits
+                file_menu.remove(file_items[item])
+
+            menu_widget = glade.get_widget("menu_edit")
+            edit_menu = menu_widget.get_submenu()
+            edit_items = edit_menu.get_children()
+            pref_item = edit_items[0]
+            ## accel_swap
+            accel_swap(pref_item, group, 'p', gtk.gdk.CONTROL_MASK, ',', gtk.gdk.META_MASK)
+            edit_menu.remove(pref_item)
+
+            conn_item = edit_items[1]
+            ## accel_meta
+            accel_meta(conn_item, group, 'm')
+            edit_menu.remove(conn_item)
+
+            mbar.remove(menu_widget)
+
+            help_menu = glade.get_widget("menu_help").get_submenu()
+            help_items = help_menu.get_children()
+            about_item = help_items[4]
+            help_menu.remove(about_item)
+            help_menu.remove(help_items[3]) # separator
+
+            mbar.hide()
+            self.osxapp.set_menu_bar(mbar)
+            # populate app menu
+            self.osxapp.insert_app_menu_item(about_item, 0)
+            self.osxapp.insert_app_menu_item(gtk.SeparatorMenuItem(), 1)
+            self.osxapp.insert_app_menu_item(pref_item, 2)
+            if not self.started_in_classic:
+                self.osxapp.insert_app_menu_item(conn_item, 3)
+            if quit_all_item.get_visible():
+                self.osxapp.insert_app_menu_item(gtk.SeparatorMenuItem(), 4)
+                self.osxapp.insert_app_menu_item(quit_all_item, 5)
+
+
+            self.osxapp.ready()
+            #from osx import OSX
+            #self.osx = OSX(self)
+
 
         # Initalize the plugins
         self.plugins = PluginManager()

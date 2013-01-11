@@ -197,7 +197,7 @@ class GtkUI(object):
                     return 1
             SetConsoleCtrlHandler(win_handler)
 
-        if deluge.common.osx_check():
+        if deluge.common.osx_check() and gtk.gdk.WINDOWING == "quartz":
             # TODO: quartz check
             import gtk_osxapplication
             self.osxapp = gtk_osxapplication.OSXApplication()
@@ -247,15 +247,16 @@ class GtkUI(object):
         self.statusbar = StatusBar()
         self.addtorrentdialog = AddTorrentDialog()
 
-        if deluge.common.osx_check():
+        if deluge.common.osx_check() and gtk.gdk.WINDOWING == "quartz":
             # TODO: quartz check
 
-            ## Doesn't do what expected yet
+            ## need to verify will open multiple files
             def nsapp_open_file(osxapp, filename):
                 # Will be raised at app launch (python opening main script)
                 if filename.endswith('Deluge-bin'):
                     return True
-                self.ipcinterface.process_args(filename)
+                from deluge.ui.gtkui.ipcinterface import process_args
+                process_args([filename])
             #self.osxapp.connect("NSApplicationOpenFile", nsapp_open_file)
 
 
